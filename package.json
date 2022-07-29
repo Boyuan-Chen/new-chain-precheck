@@ -1,0 +1,25 @@
+{
+  "name": "new-chain-precheck.nosync",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Boyuan-Chen/new-chain-precheck.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Boyuan-Chen/new-chain-precheck/issues"
+  },
+  "homepage": "https://github.com/Boyuan-Chen/new-chain-precheck#readme",
+  "dependencies": {
+    "@eth-optimism/core-utils": "^0.9.2",
+    "dotenv": "^16.0.1",
+    "eth-sig-util": "^3.0.1",
+    "ethers": "^5.6.9"
+  }
+}
