@@ -13,6 +13,7 @@ const env = process.env;
 const L1_NODE_WEB3_URL = env.L1_NODE_WEB3_URL || "http://localhost:9545";
 const L2_NODE_WEB3_URL = env.L2_NODE_WEB3_URL || "http://localhost:8545";
 const PRIAVTE_KEY = env.PRIVATE_KEY
+const GAS_PRICE_ORACLE_KEY = env.GAS_PRICE_ORACLE_KEY
 const L1_BOBA_ADDRESS = env.L1_BOBA_ADDRESS
 const L1_STANDARD_BRIDGE_ADDRESS = env.L1_STANDARD_BRIDGE_ADDRESS
 
@@ -23,6 +24,8 @@ const main = async() => {
 
   const L2Web3 = new ethers.providers.JsonRpcProvider(L2_NODE_WEB3_URL);
   const L2Wallet = new ethers.Wallet(PRIAVTE_KEY).connect(L2Web3);
+
+  const gasPriceOracleOwner = new ethers.Wallet(GAS_PRICE_ORACLE_KEY).connect(L2Web3);
 
   const L1_BOBA = new ethers.Contract(
     L1_BOBA_ADDRESS,
@@ -46,7 +49,6 @@ const main = async() => {
     Boba_GasPriceOracleJson.abi,
     L2Wallet
   )
-
 
   const approveTx = await L1_BOBA.approve(
     L1StandardBridge.address,
@@ -75,7 +77,7 @@ const main = async() => {
   await L1StandardBridge.depositNativeToken(
     300_000,
     '0x',
-    { value: ethers.utils.parseEther('0.1')}
+    { value: ethers.utils.parseEther('2')}
   )
 
   const preL1NativeTokenBalance = (await L2_L1NativeToken.balanceOf(L2Wallet.address)).toString()
@@ -87,6 +89,7 @@ const main = async() => {
 
   console.log("L1 Native Token balance:", (await L2_L1NativeToken.balanceOf(L2Wallet.address)).toString())
 
+  // EIP-712 check
   EIP712Domain = [
     { name: 'name', type: 'string' },
     { name: 'version', type: 'string' },
@@ -137,7 +140,50 @@ const main = async() => {
     sig.r,
     sig.s
   )
-  console.log(await L2_L1NativeToken.allowance(L2Wallet.address, Boba_GasPriceOracle.address))
+  console.log(`allowance: ${await L2_L1NativeToken.allowance(L2Wallet.address, Boba_GasPriceOracle.address)} - value: ${value}`)
+
+  // Fee token switch check
+  const marketPriceRatio = await Boba_GasPriceOracle.marketPriceRatio()
+  const decimals = await Boba_GasPriceOracle.decimals()
+  const secondaryFeeToken = ethers.utils.formatEther(await Boba_GasPriceOracle.getSecondaryFeeTokenForSwap())
+  const metaTransactionFee = ethers.utils.formatEther(await Boba_GasPriceOracle.metaTransactionFee())
+
+  console.log({
+    marketPriceRatio: marketPriceRatio.toNumber(),
+    decimals: decimals.toNumber(),
+    secondaryFeeToken,
+    metaTransactionFee,
+  })
+
+  console.log(`Updating parameters...`)
+  const updateDecimalsTx = await Boba_GasPriceOracle.connect(gasPriceOracleOwner).updateDecimals(3, { gasPrice: 0 })
+  await updateDecimalsTx.wait()
+
+  const updateMetaTransactionFeeTx = await Boba_GasPriceOracle.connect(gasPriceOracleOwner).updateMetaTransactionFee(ethers.utils.parseEther('0.01'), { gasPrice: 0 })
+  await updateMetaTransactionFeeTx.wait()
+
+  const updatedSecondaryFeeToken = ethers.utils.formatEther(await Boba_GasPriceOracle.getSecondaryFeeTokenForSwap())
+  const updatedMetaTransactionFee = ethers.utils.formatEther(await Boba_GasPriceOracle.metaTransactionFee())
+  console.log({ updatedSecondaryFeeToken, updatedMetaTransactionFee })
+
+  // Switch fee token
+  await Boba_GasPriceOracle.useSecondaryFeeTokenAsFeeToken()
+
+  const preBobaBalance = await L2Wallet.getBalance()
+  const preL2NativeTokenBalance = await L2_L1NativeToken.balanceOf(L2Wallet.address)
+
+  await Boba_GasPriceOracle.useBobaAsFeeToken()
+
+  const postBobaBalance = await L2Wallet.getBalance()
+  const postL2NativeTokenBalance = await L2_L1NativeToken.balanceOf(L2Wallet.address)
+
+  console.log({
+    preBobaBalance: preBobaBalance.toString(),
+    preL2NativeTokenBalance: preL2NativeTokenBalance.toString(),
+    postBobaBalance: postBobaBalance.toString(),
+    postL2NativeTokenBalance: postL2NativeTokenBalance.toString(),
+    cost: preL2NativeTokenBalance.sub(postL2NativeTokenBalance).toString()
+  })
 }
 
 main()
