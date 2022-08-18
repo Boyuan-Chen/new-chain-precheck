@@ -77,7 +77,7 @@ const main = async() => {
   await L1StandardBridge.depositNativeToken(
     300_000,
     '0x',
-    { value: ethers.utils.parseEther('2')}
+    { value: ethers.utils.parseEther('1')}
   )
 
   const preL1NativeTokenBalance = (await L2_L1NativeToken.balanceOf(L2Wallet.address)).toString()
@@ -156,8 +156,11 @@ const main = async() => {
   })
 
   console.log(`Updating parameters...`)
-  const updateDecimalsTx = await Boba_GasPriceOracle.connect(gasPriceOracleOwner).updateDecimals(3, { gasPrice: 0 })
+  const updateDecimalsTx = await Boba_GasPriceOracle.connect(gasPriceOracleOwner).updateDecimals(5, { gasPrice: 0 })
   await updateDecimalsTx.wait()
+
+  const updateReceivedBOBAAmountTx = await Boba_GasPriceOracle.connect(gasPriceOracleOwner).updateReceivedBOBAAmount(ethers.utils.parseEther('5'), { gasPrice:0 })
+  await updateReceivedBOBAAmountTx.wait()
 
   const updateMetaTransactionFeeTx = await Boba_GasPriceOracle.connect(gasPriceOracleOwner).updateMetaTransactionFee(ethers.utils.parseEther('0.01'), { gasPrice: 0 })
   await updateMetaTransactionFeeTx.wait()
